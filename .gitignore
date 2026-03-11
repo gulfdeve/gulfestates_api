@@ -1,0 +1,53 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output (TypeScript)
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE/editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Test coverage
+coverage/
+*.lcov
+
+# MongoDB local database files (if accidentally created)
+data/
+*.lock
+*.mongod
+
+# Temporary files
+tmp/
+temp/
+*.swp
+*.bak
+*.pid
+
+# Optional npm/pnpm cache
+.npm/
+.pnp/
+.pnp.js
