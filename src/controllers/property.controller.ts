@@ -1,78 +1,7 @@
 import { Request, Response } from "express";
 import Property from "../models/property.model.js";
 import { createNotification } from "./notification.controller.js";
-import cloudinary from "../config/cloudinary.js";
-import fs from "fs";
 import escapeStringRegexp from "escape-string-regexp";
-
-const uploadImage = async (filePath: string) => {
-  const result = await cloudinary.uploader.upload(filePath, {
-    folder: "properties/images",
-  });
-  fs.unlinkSync(filePath);
-  return result.secure_url;
-};
-
-const uploadMultipleImages = async (files: Express.Multer.File[]) => {
-  const uploadPromises = files.map(file => uploadImage(file.path));
-  return Promise.all(uploadPromises);
-};
-
-// Helper function to upload PDF files
-const uploadPDF = async (filePath: string) => {
-  try {
-    console.log("📤 Uploading PDF to Cloudinary from path:", filePath);
-
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`File not found at path: ${filePath}`);
-    }
-
-    const result = await cloudinary.uploader.upload(filePath, {
-      folder: "properties/brochures",
-      resource_type: "raw", // PDF files should be uploaded as raw files
-      use_filename: true,
-      unique_filename: true,
-      access_mode: "public", // Ensure the file is publicly accessible
-      type: "upload", // Explicitly set upload type
-    });
-
-    // For raw files, use secure_url directly but ensure it's properly formatted
-    // Cloudinary's secure_url for raw files should already be correct
-    let pdfUrl = result.secure_url;
-
-    // Ensure the URL uses HTTPS and has the correct path structure for raw files
-    // If secure_url doesn't contain '/raw/upload/', regenerate it using cloudinary.url()
-    if (!pdfUrl.includes('/raw/upload/')) {
-      pdfUrl = cloudinary.url(result.public_id, {
-        resource_type: 'raw',
-        secure: true
-      });
-    }
-
-    console.log("✅ PDF uploaded successfully to Cloudinary:", pdfUrl);
-    console.log("📄 Public ID:", result.public_id);
-
-    // Delete local file after successful upload
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      console.log("🗑️ Local file deleted:", filePath);
-    }
-
-    return pdfUrl;
-  } catch (error) {
-    console.error("❌ Error uploading PDF to Cloudinary:", error);
-    // Delete local file even on error
-    if (fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-      } catch (unlinkError) {
-        console.error("Error deleting local file:", unlinkError);
-      }
-    }
-    throw error;
-  }
-};
 
 // Helper function to get localized field
 const getLocalizedField = (field: any, locale: string = 'en') => {
@@ -362,7 +291,7 @@ export const createProperty = async (req: Request, res: Response) => {
             message: `Main image size exceeds 1MB limit. File size: ${(mainImageFile.size / (1024 * 1024)).toFixed(2)}MB`
           });
         }
-        imageUrl = await uploadImage(mainImageFile.path);
+        imageUrl = mainImageFile.path;
       }
 
       // Handle additional images (max 20 images, total max 15MB)
@@ -385,15 +314,15 @@ export const createProperty = async (req: Request, res: Response) => {
           });
         }
 
-        additionalImages = await uploadMultipleImages(files.images);
+        additionalImages = files.images.map(f => f.path);
         console.log("📸 Additional images uploaded:", additionalImages.length);
       }
 
       // Handle brochure PDF upload for CREATE
       if (files.brochure && files.brochure[0]) {
         try {
-          console.log("📤 Processing brochure PDF file upload (CREATE):", files.brochure[0].filename, "Size:", files.brochure[0].size, "bytes");
-          brochureUrl = await uploadPDF(files.brochure[0].path);
+          console.log("📤 Processing brochure PDF file upload (CREATE):", files.brochure[0].originalname, "Size:", files.brochure[0].size, "bytes");
+          brochureUrl = files.brochure[0].path;
           console.log("✅ Property Brochure uploaded to Cloudinary (CREATE):", brochureUrl);
         } catch (error) {
           console.error("❌ Error uploading brochure to Cloudinary:", error);
@@ -414,7 +343,7 @@ export const createProperty = async (req: Request, res: Response) => {
             message: `QR image size exceeds 1MB limit. File size: ${(qrImageFile.size / (1024 * 1024)).toFixed(2)}MB`
           });
         }
-        qrImageUrl = await uploadImage(qrImageFile.path);
+        qrImageUrl = qrImageFile.path;
         console.log("📸 Property QR image uploaded:", qrImageUrl);
         req.body.qrImage = qrImageUrl;
       }
@@ -688,7 +617,7 @@ export const updateProperty = async (req: Request, res: Response) => {
             message: `Main image size exceeds 1MB limit. File size: ${(mainImageFile.size / (1024 * 1024)).toFixed(2)}MB`
           });
         }
-        const imageUrl = await uploadImage(mainImageFile.path);
+        const imageUrl = mainImageFile.path;
         updateData.image = imageUrl;
       }
 
@@ -712,7 +641,7 @@ export const updateProperty = async (req: Request, res: Response) => {
           });
         }
 
-        const additionalImages = await uploadMultipleImages(files.images);
+        const additionalImages = files.images.map(f => f.path);
         // If images are already in updateData, merge them; otherwise use existing property images
         const existingImages = Array.isArray(updateData.images)
           ? updateData.images
@@ -723,8 +652,8 @@ export const updateProperty = async (req: Request, res: Response) => {
       // Handle brochure PDF upload - File upload takes highest priority
       if (files.brochure && files.brochure[0]) {
         try {
-          console.log("📤 Processing brochure PDF file upload:", files.brochure[0].filename, "Size:", files.brochure[0].size, "bytes");
-          const brochureUrl = await uploadPDF(files.brochure[0].path);
+          console.log("📤 Processing brochure PDF file upload:", files.brochure[0].originalname, "Size:", files.brochure[0].size, "bytes");
+          const brochureUrl = files.brochure[0].path;
           updateData.brochure = brochureUrl;
           console.log("✅ Property Brochure uploaded to Cloudinary and URL saved:", brochureUrl);
         } catch (error) {
@@ -756,7 +685,7 @@ export const updateProperty = async (req: Request, res: Response) => {
             message: `QR image size exceeds 1MB limit. File size: ${(qrImageFile.size / (1024 * 1024)).toFixed(2)}MB`
           });
         }
-        updateData.qrImage = await uploadImage(qrImageFile.path);
+        updateData.qrImage = qrImageFile.path;
         console.log("📸 Property QR image uploaded:", updateData.qrImage);
       } else if (req.body.qrImage && typeof req.body.qrImage === 'string' && req.body.qrImage.trim() !== '') {
         // Keep existing QR image URL if no new file uploaded

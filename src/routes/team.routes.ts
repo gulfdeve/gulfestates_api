@@ -12,7 +12,7 @@ import {
 } from "../controllers/members.controller.js";
 import { protect, restrictToSuperAdmin } from "../middleware/auth.middleware.js";
 import { generalApiRateLimiter } from "../middleware/rateLimiter.middleware.js";
-import { upload } from "../middleware/upload.middleware.js";
+import { uploadTeamImage } from "../utils/multerCloudinary.js";
 
 const router = express.Router();
 
@@ -21,12 +21,10 @@ const validateImageUploads = (req: express.Request, res: express.Response, next:
   const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
   
   if (files) {
-    // Check all uploaded files
     for (const fieldname in files) {
       const fileArray = files[fieldname];
       if (Array.isArray(fileArray)) {
         for (const file of fileArray) {
-          // Only allow ownerImage or teamslider[*]image fields
           const isValidField = 
             fieldname === 'ownerImage' || 
             /^teamslider\[\d+\]image$/.test(fieldname);
@@ -38,7 +36,6 @@ const validateImageUploads = (req: express.Request, res: express.Response, next:
             });
           }
           
-          // Validate file is an image
           const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
           if (!allowedMimeTypes.includes(file.mimetype)) {
             return res.status(400).json({
@@ -56,14 +53,14 @@ const validateImageUploads = (req: express.Request, res: express.Response, next:
 
 // Team Data Routes
 router.get("/", generalApiRateLimiter, getTeam);
-// Allow image uploads for owner image and teamslider images (any number)
-router.put("/", protect, restrictToSuperAdmin, upload.any(), validateImageUploads, updateTeam);
+router.put("/", protect, restrictToSuperAdmin, uploadTeamImage.any(), validateImageUploads, updateTeam);
 
 // Members Routes (nested)
 router.get("/members", generalApiRateLimiter, getAllMembers);
 router.get("/members/:id", generalApiRateLimiter, getMemberById);
-router.post("/members", protect, restrictToSuperAdmin, upload.single('image'), createMember);
-router.put("/members/:id", protect, restrictToSuperAdmin, upload.single('image'), updateMember);
+router.post("/members", protect, restrictToSuperAdmin, uploadTeamImage.single('image'), createMember);
+router.put("/members/:id", protect, restrictToSuperAdmin, uploadTeamImage.single('image'), updateMember);
 router.delete("/members/:id", protect, restrictToSuperAdmin, deleteMember);
 
 export default router;
+

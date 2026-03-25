@@ -43,6 +43,68 @@ const pdfStorage = new CloudinaryStorage({
   } as any,
 });
 
+// ✅ Property files — images go to properties/images, brochures (PDF) go to properties/brochures
+const propertyStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req: any, file: Express.Multer.File) => {
+    if (file.fieldname === 'brochure') {
+      return {
+        folder: 'properties/brochures',
+        resource_type: 'raw',
+        allowed_formats: ['pdf'],
+        use_filename: true,
+        unique_filename: true,
+        access_mode: 'public',
+        type: 'upload',
+      };
+    }
+    return {
+      folder: 'properties/images',
+      allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'avif'],
+    };
+  },
+} as any);
+
+// ✅ OffPlan files — images go to offplans/images, brochures (PDF) go to offplans/brochures
+const offPlanStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async (req: any, file: Express.Multer.File) => {
+    if (file.fieldname === 'brochure') {
+      return {
+        folder: 'offplans/brochures',
+        resource_type: 'raw',
+        allowed_formats: ['pdf'],
+        use_filename: true,
+        unique_filename: true,
+        access_mode: 'public',
+        type: 'upload',
+      };
+    }
+    return {
+      folder: 'offplans/images',
+      allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'avif'],
+    };
+  },
+} as any);
+
+// ✅ Team images (owner, teamslider, members)
+const teamImageStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'gulf-estates/team',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+  } as any,
+});
+
+// ✅ Email marketing campaign images
+const emailMarketingStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'email-marketing/images',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+  } as any,
+});
+
 // ✅ Job Resume/Portfolio Storage - PDF and DOCX, uploads to Cloudinary first (fileFilter restricts types)
 const jobResumeStorage = new CloudinaryStorage({
   cloudinary,
@@ -109,6 +171,19 @@ const jobResumeFileFilter = (req: any, file: Express.Multer.File, cb: multer.Fil
   }
 };
 
+// File filter for property/offplan routes — images OR PDF brochure based on fieldname
+const propertyFileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  if (isDangerousFile(file.originalname)) {
+    return cb(new Error(`File type ${path.extname(file.originalname)} is not allowed. Executable and script files are blocked.`));
+  }
+  if (file.fieldname === 'brochure') {
+    if (isAllowedPDF(file.originalname, file.mimetype)) return cb(null, true);
+    return cb(new Error('Only PDF files are allowed for brochures!'));
+  }
+  if (isAllowedImage(file.originalname, file.mimetype)) return cb(null, true);
+  return cb(new Error('Only image files (JPEG, JPG, PNG, WEBP, AVIF) are allowed!'));
+};
+
 // ✅ Multer upload instances with security filters
 export const uploadImage = multer({ 
   storage: imageStorage,
@@ -135,4 +210,31 @@ export const uploadJobResume = multer({
     fileSize: 3 * 1024 * 1024, // 3MB limit
   },
   fileFilter: jobResumeFileFilter
+});
+
+/** Property images (JPEG/PNG/WEBP/AVIF) + PDF brochure — streams directly to Cloudinary */
+export const uploadPropertyFiles = multer({
+  storage: propertyStorage,
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: propertyFileFilter,
+});
+
+/** OffPlan images (JPEG/PNG/WEBP/AVIF) + PDF brochure — streams directly to Cloudinary */
+export const uploadOffPlanFiles = multer({
+  storage: offPlanStorage,
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: propertyFileFilter,
+});
+
+/** Team / member images — streams directly to Cloudinary */
+export const uploadTeamImage = multer({
+  storage: teamImageStorage,
+  fileFilter: imageFileFilter,
+});
+
+/** Email marketing campaign banner image — streams directly to Cloudinary */
+export const uploadEmailMarketingImage = multer({
+  storage: emailMarketingStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: imageFileFilter,
 });

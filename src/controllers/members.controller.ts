@@ -3,78 +3,39 @@ import Team from "../models/team.model.js";
 import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.js";
 import { downloadAndUploadImage } from "../utils/imageDownloader.js";
-import fs from "fs";
-
-// Helper function to upload image file to Cloudinary
-const uploadImageToCloudinary = async (filePath: string, folder: string = 'team/members'): Promise<string> => {
-  try {
-    const result = await cloudinary.uploader.upload(filePath, {
-      folder: `gulf-estates/${folder}`,
-      resource_type: 'image',
-      // No transformation - preserve original image without cropping
-    });
-    
-    // Delete local file after upload
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-    
-    return result.secure_url;
-  } catch (error: any) {
-    // Delete local file on error
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-    throw error;
-  }
-};
 
 // Helper function to process image (file, URL, or base64)
 const processImage = async (imageData: any, folder: string = 'team/members'): Promise<string> => {
   try {
-    // Return empty string if imageData is empty or invalid
     if (!imageData || imageData === "" || (typeof imageData === 'string' && imageData.trim() === "")) {
       return "";
     }
 
-    // If it's already a Cloudinary URL, return it
+    // Already a Cloudinary URL
     if (typeof imageData === 'string' && imageData.includes('cloudinary.com')) {
       return imageData;
     }
 
-    // If it's a file path (from multer), upload it
-    if (typeof imageData === 'string' && fs.existsSync(imageData)) {
-      return await uploadImageToCloudinary(imageData, folder);
-    }
+    // File path from multer-storage-cloudinary: file.path IS the Cloudinary URL
+    // (multer-storage-cloudinary sets file.path to the secure_url)
 
-    // If it's a URL (not Cloudinary), download and upload
+    // External URL (not Cloudinary) — download and re-upload
     if (typeof imageData === 'string' && (imageData.startsWith('http://') || imageData.startsWith('https://'))) {
       return await downloadAndUploadImage(imageData, folder);
     }
 
-    // If it's base64, convert and upload
+    // Base64 data URI — upload directly without writing to disk
     if (typeof imageData === 'string' && imageData.startsWith('data:image/')) {
-      const base64Data = imageData.split(',')[1];
-      if (!base64Data) {
-        return "";
-      }
-      const buffer = Buffer.from(base64Data, 'base64');
-      const tempPath = `uploads/temp-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-      
-      // Ensure uploads directory exists
-      if (!fs.existsSync('uploads')) {
-        fs.mkdirSync('uploads', { recursive: true });
-      }
-      
-      fs.writeFileSync(tempPath, buffer);
-      return await uploadImageToCloudinary(tempPath, folder);
+      const result = await cloudinary.uploader.upload(imageData, {
+        folder: `gulf-estates/${folder}`,
+        resource_type: 'image',
+      });
+      return result.secure_url;
     }
 
-    // Return original value if we can't process it
     return imageData || "";
   } catch (error: any) {
     console.error('Error processing image:', error);
-    // Return original value if processing fails
     return imageData || "";
   }
 };
@@ -310,7 +271,7 @@ export const updateMember = async (req: Request, res: Response): Promise<void> =
     if (image !== undefined) {
       if (files?.image && files.image[0]) {
         // Image comes from file upload
-        image = await uploadImageToCloudinary(files.image[0].path, 'team/members');
+        image = files.image[0].path; // already Cloudinary URL via multer-storage-cloudinary
       } else if (image && image !== existingMember?.image) {
         // Only process if image has changed
         image = await processImage(image, 'team/members');

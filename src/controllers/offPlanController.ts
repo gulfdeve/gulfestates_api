@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import OffPlan from "../models/OffPlan.js";
 import { isValidImageUrl, getFallbackImage } from "../utils/imageUtils.js";
 import cloudinary from "../config/cloudinary.js";
-import fs from "fs";
 import { downloadAndUploadImage, downloadAndUploadMultipleImages } from "../utils/imageDownloader.js";
 import { translateToFrench, translateToSpanish, translateHtmlToFrench, translateHtmlToSpanish, delay } from "../utils/translation.util.js";
 import { fixCloudinaryUrl, extractPublicIdFromUrl } from "../utils/cloudinary.util.js";
@@ -90,77 +89,6 @@ const cleanDescription = (html: string): string => {
     .trim();
 
   return cleaned;
-};
-
-// Helper functions for file uploads
-const uploadImage = async (filePath: string) => {
-  const result = await cloudinary.uploader.upload(filePath, {
-    folder: "offplans/images",
-  });
-  fs.unlinkSync(filePath);
-  return result.secure_url;
-};
-
-const uploadMultipleImages = async (files: Express.Multer.File[]) => {
-  const uploadPromises = files.map(file => uploadImage(file.path));
-  return Promise.all(uploadPromises);
-};
-
-// Helper function to upload PDF files
-const uploadPDF = async (filePath: string) => {
-  try {
-    console.log("📤 Uploading PDF to Cloudinary from path:", filePath);
-
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`File not found at path: ${filePath}`);
-    }
-
-    const result = await cloudinary.uploader.upload(filePath, {
-      folder: "offplans/brochures",
-      resource_type: "raw", // PDF files should be uploaded as raw files
-      use_filename: true,
-      unique_filename: true,
-      access_mode: "public", // Ensure the file is publicly accessible
-      type: "upload", // Explicitly set upload type
-      // Note: PDF delivery must be enabled in Cloudinary Settings > Security > "Allow delivery of PDF and ZIP files"
-    });
-
-    // For raw files, use secure_url directly but ensure it's properly formatted
-    // Cloudinary's secure_url for raw files should already be correct
-    let pdfUrl = result.secure_url;
-    
-    // Ensure the URL uses HTTPS and has the correct path structure for raw files
-    // If secure_url doesn't contain '/raw/upload/', regenerate it using cloudinary.url()
-    if (!pdfUrl.includes('/raw/upload/')) {
-      pdfUrl = cloudinary.url(result.public_id, {
-        resource_type: 'raw',
-        secure: true
-      });
-    }
-
-    console.log("✅ PDF uploaded successfully to Cloudinary:", pdfUrl);
-    console.log("📄 Public ID:", result.public_id);
-
-    // Delete local file after successful upload
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      console.log("🗑️ Local file deleted:", filePath);
-    }
-
-    return pdfUrl;
-  } catch (error) {
-    console.error("❌ Error uploading PDF to Cloudinary:", error);
-    // Delete local file even on error
-    if (fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-      } catch (unlinkError) {
-        console.error("Error deleting local file:", unlinkError);
-      }
-    }
-    throw error;
-  }
 };
 
 // Get all offplans with enhanced filters
@@ -468,7 +396,7 @@ export const createOffPlan = async (req: Request, res: Response) => {
             message: `Main image size exceeds 1MB limit. File size: ${(mainImageFile.size / (1024 * 1024)).toFixed(2)}MB`
           });
         }
-        imageUrl = await uploadImage(mainImageFile.path);
+        imageUrl = mainImageFile.path;
         console.log("📸 OffPlan Main image uploaded:", imageUrl);
       }
 
@@ -492,15 +420,15 @@ export const createOffPlan = async (req: Request, res: Response) => {
           });
         }
         
-        additionalImages = await uploadMultipleImages(files.images);
+        additionalImages = files.images.map(f => f.path);
         console.log("📸 OffPlan Additional images uploaded:", additionalImages.length);
       }
 
       // Handle brochure PDF upload for CREATE
       if (files.brochure && files.brochure[0]) {
         try {
-          console.log("📤 Processing brochure PDF file upload (CREATE):", files.brochure[0].filename, "Size:", files.brochure[0].size, "bytes");
-          brochureUrl = await uploadPDF(files.brochure[0].path);
+          console.log("📤 Processing brochure PDF file upload (CREATE):", files.brochure[0].originalname, "Size:", files.brochure[0].size, "bytes");
+          brochureUrl = files.brochure[0].path;
           console.log("✅ OffPlan Brochure uploaded to Cloudinary (CREATE):", brochureUrl);
         } catch (error) {
           console.error("❌ Error uploading brochure to Cloudinary:", error);
@@ -521,7 +449,7 @@ export const createOffPlan = async (req: Request, res: Response) => {
             message: `QR image size exceeds 1MB limit. File size: ${(qrImageFile.size / (1024 * 1024)).toFixed(2)}MB`
           });
         }
-        const qrImageUrl = await uploadImage(qrImageFile.path);
+        const qrImageUrl = qrImageFile.path;
         console.log("📸 OffPlan QR image uploaded:", qrImageUrl);
         req.body.qrImage = qrImageUrl;
       }
@@ -779,7 +707,7 @@ export const updateOffPlan = async (req: Request, res: Response) => {
             message: `Main image size exceeds 1MB limit. File size: ${(mainImageFile.size / (1024 * 1024)).toFixed(2)}MB`
           });
         }
-        updateData.image = await uploadImage(mainImageFile.path);
+        updateData.image = mainImageFile.path;
         console.log("📸 OffPlan Main image uploaded:", updateData.image);
       }
 
@@ -803,7 +731,7 @@ export const updateOffPlan = async (req: Request, res: Response) => {
           });
         }
         
-        const uploadedImages = await uploadMultipleImages(files.images);
+        const uploadedImages = files.images.map(f => f.path);
         console.log("📸 OffPlan Additional images uploaded:", uploadedImages.length);
 
         // Merge with existing images if any
@@ -817,8 +745,8 @@ export const updateOffPlan = async (req: Request, res: Response) => {
       // Handle brochure PDF upload - File upload takes highest priority
       if (files.brochure && files.brochure[0]) {
         try {
-          console.log("📤 Processing brochure PDF file upload:", files.brochure[0].filename, "Size:", files.brochure[0].size, "bytes");
-          const brochureUrl = await uploadPDF(files.brochure[0].path);
+          console.log("📤 Processing brochure PDF file upload:", files.brochure[0].originalname, "Size:", files.brochure[0].size, "bytes");
+          const brochureUrl = files.brochure[0].path;
           updateData.brochure = brochureUrl;
           console.log("✅ OffPlan Brochure uploaded to Cloudinary and URL saved:", brochureUrl);
         } catch (error) {
@@ -851,7 +779,7 @@ export const updateOffPlan = async (req: Request, res: Response) => {
               message: `QR image size exceeds 1MB limit. File size: ${(qrImageFile.size / (1024 * 1024)).toFixed(2)}MB`
             });
           }
-          const qrImageUrl = await uploadImage(qrImageFile.path);
+          const qrImageUrl = qrImageFile.path;
           updateData.qrImage = qrImageUrl;
           console.log("✅ OffPlan QR image uploaded to Cloudinary:", qrImageUrl);
         } catch (error) {

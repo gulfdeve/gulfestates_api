@@ -1,6 +1,4 @@
 import { Request, Response } from "express";
-import cloudinary from "../config/cloudinary.js";
-import fs from "fs";
 import EmailMarketing from "../models/EmailMarketing.js";
 import HomePageLead from "../models/HomePageLead.js";
 import Contact from "../models/contact.js";
@@ -65,14 +63,6 @@ const checkDailyEmailLimit = async (adminId: string): Promise<{ allowed: boolean
  */
 const delay = (ms: number): Promise<void> => {
   return new Promise(resolve => setTimeout(resolve, ms));
-};
-
-const uploadImage = async (filePath: string) => {
-    const result = await cloudinary.uploader.upload(filePath, {
-        folder: "email-marketing/images",
-    });
-    fs.unlinkSync(filePath);
-    return result.secure_url;
 };
 
 /**
@@ -277,7 +267,8 @@ export const createEmailCampaign = async (req: Request, res: Response) => {
         // Handle image upload
         let imageUrl = "";
         if (req.file) {
-            imageUrl = await uploadImage(req.file.path);
+            // With multer-storage-cloudinary, file.path is already the Cloudinary URL
+            imageUrl = req.file.path;
         } else if (req.body.image) {
             // If image is already a URL (from frontend)
             imageUrl = req.body.image;

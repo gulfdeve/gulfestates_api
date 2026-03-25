@@ -4,7 +4,6 @@ import Admin from "../models/admin.model.js";
 import Team from "../models/team.model.js";
 import cloudinary from "../config/cloudinary.js";
 import { downloadAndUploadImage } from "../utils/imageDownloader.js";
-import fs from "fs";
 
 // Helper function to verify token and check if user is authenticated admin
 const verifyAdminToken = async (req: Request): Promise<boolean> => {
@@ -34,76 +33,38 @@ const verifyAdminToken = async (req: Request): Promise<boolean> => {
   }
 };
 
-// Helper function to upload image file to Cloudinary
-const uploadImageToCloudinary = async (filePath: string, folder: string = 'team/images'): Promise<string> => {
-  try {
-    const result = await cloudinary.uploader.upload(filePath, {
-      folder: `gulf-estates/${folder}`,
-      resource_type: 'image',
-      // No transformation - preserve original image without cropping
-    });
-    
-    // Delete local file after upload
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-    
-    return result.secure_url;
-  } catch (error: any) {
-    // Delete local file on error
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-    throw error;
-  }
-};
-
 // Helper function to process image (file, URL, or base64)
 const processImage = async (imageData: any, folder: string = 'team/images'): Promise<string> => {
   try {
-    // Return empty string if imageData is empty or invalid
     if (!imageData || imageData === "" || (typeof imageData === 'string' && imageData.trim() === "")) {
       return "";
     }
 
-    // If it's already a Cloudinary URL, return it
+    // Already a Cloudinary URL
     if (typeof imageData === 'string' && imageData.includes('cloudinary.com')) {
       return imageData;
     }
 
-    // If it's a file path (from multer), upload it
-    if (typeof imageData === 'string' && fs.existsSync(imageData)) {
-      return await uploadImageToCloudinary(imageData, folder);
-    }
+    // File path from multer-storage-cloudinary: file.path IS the Cloudinary URL
+    // (multer-storage-cloudinary sets file.path to the secure_url)
 
-    // If it's a URL (not Cloudinary), download and upload
+    // External URL (not Cloudinary) — download and re-upload
     if (typeof imageData === 'string' && (imageData.startsWith('http://') || imageData.startsWith('https://'))) {
       return await downloadAndUploadImage(imageData, folder);
     }
 
-    // If it's base64, convert and upload
+    // Base64 data URI — upload directly without writing to disk
     if (typeof imageData === 'string' && imageData.startsWith('data:image/')) {
-      const base64Data = imageData.split(',')[1];
-      if (!base64Data) {
-        return "";
-      }
-      const buffer = Buffer.from(base64Data, 'base64');
-      const tempPath = `uploads/temp-${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-      
-      // Ensure uploads directory exists
-      if (!fs.existsSync('uploads')) {
-        fs.mkdirSync('uploads', { recursive: true });
-      }
-      
-      fs.writeFileSync(tempPath, buffer);
-      return await uploadImageToCloudinary(tempPath, folder);
+      const result = await cloudinary.uploader.upload(imageData, {
+        folder: `gulf-estates/${folder}`,
+        resource_type: 'image',
+      });
+      return result.secure_url;
     }
 
-    // Return original value if we can't process it
     return imageData || "";
   } catch (error: any) {
     console.error('Error processing image:', error);
-    // Return original value if processing fails
     return imageData || "";
   }
 };
@@ -351,7 +312,7 @@ export const updateTeam = async (req: Request, res: Response): Promise<void> => 
     if (owner) {
       // Process owner image
       if (files?.ownerImage && files.ownerImage[0]) {
-        owner.image = await uploadImageToCloudinary(files.ownerImage[0].path, 'team/owner');
+        owner.image = files.ownerImage[0].path; // already Cloudinary URL via multer-storage-cloudinary
       } else if (owner.image && owner.image !== existingTeam.owner?.image) {
         // Only process if image has changed
         owner.image = await processImage(owner.image, 'team/owner');
@@ -376,7 +337,7 @@ export const updateTeam = async (req: Request, res: Response): Promise<void> => 
             // Check if image comes from file upload
             const fileKey = `teamslider[${i}]image`;
             if (files && files[fileKey] && files[fileKey][0]) {
-              item.image = await uploadImageToCloudinary(files[fileKey][0].path, 'team/slider');
+              item.image = files[fileKey][0].path; // already Cloudinary URL via multer-storage-cloudinary
             } else if (item.image !== existingTeam.teamslider?.[i]?.image) {
               // Only process if image has changed
               item.image = await processImage(item.image, 'team/slider');
