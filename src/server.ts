@@ -56,9 +56,6 @@ app.use(helmet());
 app.use(csrfProtection);
 
 const corsUrls = [
-  "https://gulf.smbdigitalzone.com",
-  "https://admin.gulf.smbdigitalzone.com",
-  "https://backend.gulf.smbdigitalzone.com",
   "https://gulfestates.ae",
   "https://www.gulfestates.ae",
   "https://backend.gulfestates.ae",
