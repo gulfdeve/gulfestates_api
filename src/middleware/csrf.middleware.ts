@@ -12,9 +12,6 @@ export const csrfProtection = (req: Request, res: Response, next: NextFunction) 
   
   // List of allowed origins
   const allowedOrigins = [
-    'https://gulf.smbdigitalzone.com',
-    'https://admin.gulf.smbdigitalzone.com',
-    'https://backend.gulf.smbdigitalzone.com',
     'https://gulfestates.ae',
     'https://www.gulfestates.ae',
     'https://backend.gulfestates.ae',
