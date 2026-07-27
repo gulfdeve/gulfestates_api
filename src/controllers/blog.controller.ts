@@ -229,128 +229,69 @@ export const getBlogs = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-// ✅ Get Featured Blog
+// ✅ Get Featured Blog (always the latest published blog by date for the locale)
 export const getFeaturedBlog = async (req: Request, res: Response): Promise<void> => {
   try {
     const locale = (req.query.locale as string) || 'en';
     const excludeContent = req.query.excludeContent === 'true'; // Exclude content for list views
     const listProjection = excludeContent ? '-content -languages.fr.content -languages.es.content' : '';
 
-    // Get all published featured blogs first
-    const featuredQuery = Blog.find({ featured: true, published: true }).sort({ date: -1 });
-    const allFeaturedBlogs = await (listProjection ? featuredQuery.select(listProjection) : featuredQuery);
-
-    let featuredBlog = null;
+    let latestBlog = null;
 
     if (locale === 'en') {
-      // For English: find featured blog that is NOT French or Spanish
-      featuredBlog = allFeaturedBlogs.find((blog: any) => {
+      const latestEnQuery = Blog.find({ title: { $exists: true, $ne: "" }, published: true }).sort({ date: -1 });
+      const allBlogs = await (listProjection ? latestEnQuery.select(listProjection) : latestEnQuery);
+      latestBlog = allBlogs.find((blog: any) => {
         const mainTitle = blog.title?.trim();
         const frenchTitle = blog.languages?.fr?.title?.trim();
         const spanishTitle = blog.languages?.es?.title?.trim();
-
-        // Exclude if main title matches French or Spanish title
         if (frenchTitle && mainTitle === frenchTitle) return false;
         if (spanishTitle && mainTitle === spanishTitle) return false;
-
         return true;
       });
     } else if (locale === 'fr') {
-      // For French: find featured blog where title matches languages.fr.title
-      featuredBlog = allFeaturedBlogs.find((blog: any) => {
+      const latestFrQuery = Blog.find({ "languages.fr.title": { $exists: true, $ne: "" }, published: true }).sort({ date: -1 });
+      const allBlogs = await (listProjection ? latestFrQuery.select(listProjection) : latestFrQuery);
+      latestBlog = allBlogs.find((blog: any) => {
         const mainTitle = blog.title?.trim();
         const frenchTitle = blog.languages?.fr?.title?.trim();
         return mainTitle && frenchTitle && mainTitle === frenchTitle;
       });
     } else if (locale === 'es') {
-      // For Spanish: find featured blog where title matches languages.es.title
-      featuredBlog = allFeaturedBlogs.find((blog: any) => {
+      const latestEsQuery = Blog.find({ "languages.es.title": { $exists: true, $ne: "" }, published: true }).sort({ date: -1 });
+      const allBlogs = await (listProjection ? latestEsQuery.select(listProjection) : latestEsQuery);
+      latestBlog = allBlogs.find((blog: any) => {
         const mainTitle = blog.title?.trim();
         const spanishTitle = blog.languages?.es?.title?.trim();
         return mainTitle && spanishTitle && mainTitle === spanishTitle;
       });
     }
 
-    // If no featured blog found for this locale, get the latest blog of that locale
-    if (!featuredBlog) {
-      let latestBlog = null;
-
-      if (locale === 'en') {
-        const latestEnQuery = Blog.find({ title: { $exists: true, $ne: "" }, published: true }).sort({ date: -1 });
-        const allBlogs = await (listProjection ? latestEnQuery.select(listProjection) : latestEnQuery);
-        latestBlog = allBlogs.find((blog: any) => {
-          const mainTitle = blog.title?.trim();
-          const frenchTitle = blog.languages?.fr?.title?.trim();
-          const spanishTitle = blog.languages?.es?.title?.trim();
-          if (frenchTitle && mainTitle === frenchTitle) return false;
-          if (spanishTitle && mainTitle === spanishTitle) return false;
-          return true;
-        });
-      } else if (locale === 'fr') {
-        const latestFrQuery = Blog.find({ "languages.fr.title": { $exists: true, $ne: "" }, published: true }).sort({ date: -1 });
-        const allBlogs = await (listProjection ? latestFrQuery.select(listProjection) : latestFrQuery);
-        latestBlog = allBlogs.find((blog: any) => {
-          const mainTitle = blog.title?.trim();
-          const frenchTitle = blog.languages?.fr?.title?.trim();
-          return mainTitle && frenchTitle && mainTitle === frenchTitle;
-        });
-      } else if (locale === 'es') {
-        const latestEsQuery = Blog.find({ "languages.es.title": { $exists: true, $ne: "" }, published: true }).sort({ date: -1 });
-        const allBlogs = await (listProjection ? latestEsQuery.select(listProjection) : latestEsQuery);
-        latestBlog = allBlogs.find((blog: any) => {
-          const mainTitle = blog.title?.trim();
-          const spanishTitle = blog.languages?.es?.title?.trim();
-          return mainTitle && spanishTitle && mainTitle === spanishTitle;
-        });
-      }
-
-      if (latestBlog) {
-        let localizedLatest = getLocalizedDocument(latestBlog, locale);
-        
-        // Remove content if excludeContent is true
-        if (excludeContent) {
-          const latestCopy = { ...localizedLatest };
-          delete latestCopy.content;
-          if (latestCopy.languages) {
-            if (latestCopy.languages.fr) delete latestCopy.languages.fr.content;
-            if (latestCopy.languages.es) delete latestCopy.languages.es.content;
-          }
-          localizedLatest = latestCopy;
-        }
-        
-        res.status(200).json({
-          success: true,
-          data: localizedLatest,
-        });
-        return;
-      }
-    }
-
-    if (featuredBlog) {
-      // Localize the title based on locale
-      let localizedFeatured = getLocalizedDocument(featuredBlog, locale);
-      
-      // Remove content if excludeContent is true
-      if (excludeContent) {
-        const featuredCopy = { ...localizedFeatured };
-        delete featuredCopy.content;
-        if (featuredCopy.languages) {
-          if (featuredCopy.languages.fr) delete featuredCopy.languages.fr.content;
-          if (featuredCopy.languages.es) delete featuredCopy.languages.es.content;
-        }
-        localizedFeatured = featuredCopy;
-      }
-      
-      res.status(200).json({
-        success: true,
-        data: localizedFeatured,
-      });
-    } else {
+    if (!latestBlog) {
       res.status(200).json({
         success: true,
         data: null,
       });
+      return;
     }
+
+    let localizedLatest = getLocalizedDocument(latestBlog, locale);
+
+    // Remove content if excludeContent is true
+    if (excludeContent) {
+      const latestCopy = { ...localizedLatest };
+      delete latestCopy.content;
+      if (latestCopy.languages) {
+        if (latestCopy.languages.fr) delete latestCopy.languages.fr.content;
+        if (latestCopy.languages.es) delete latestCopy.languages.es.content;
+      }
+      localizedLatest = latestCopy;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: localizedLatest,
+    });
   } catch (error: any) {
     res.status(500).json({
       success: false,

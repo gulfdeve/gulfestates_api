@@ -5,6 +5,7 @@ import morgan from "morgan";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import compression from "compression";
+import dns from "node:dns";
 // import rateLimit from "express-rate-limit";
 
 // Routes
@@ -39,6 +40,14 @@ import { csrfProtection } from "./middleware/csrf.middleware.js";
 
 // Load environment variables
 dotenv.config();
+
+// Node's default DNS resolver can misbehave on Windows dev machines with
+// VPN/virtual adapters installed, causing SRV lookups (mongodb+srv://) to
+// fail with ECONNREFUSED even though the OS resolver works fine. Force a
+// known-good resolver in development to avoid that.
+if (process.env.NODE_ENV === "development") {
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+}
 
 const app: Application = express();
 const PORT = process.env.PORT || 5000;
