@@ -141,7 +141,7 @@ export const getBlogs = async (req: Request, res: Response): Promise<void> => {
 
     if (locale === 'en') {
       // For English: get all published blogs, then filter to exclude French/Spanish blogs
-      const enQuery = Blog.find({ title: { $exists: true, $ne: "" }, published: true }).sort({ createdAt: -1 });
+      const enQuery = Blog.find({ title: { $exists: true, $ne: "" }, published: true }).sort({ date: -1 });
       const allBlogs = await (listProjection ? enQuery.select(listProjection) : enQuery);
 
       // Filter to only show English blogs (exclude where title matches French/Spanish title)
@@ -168,7 +168,7 @@ export const getBlogs = async (req: Request, res: Response): Promise<void> => {
       blogs = blogs.slice(skip, skip + limit);
     } else if (locale === 'fr') {
       // For French: only show published blogs where title matches languages.fr.title
-      const frQuery = Blog.find({ "languages.fr.title": { $exists: true, $ne: "" }, published: true }).sort({ createdAt: -1 });
+      const frQuery = Blog.find({ "languages.fr.title": { $exists: true, $ne: "" }, published: true }).sort({ date: -1 });
       const allBlogs = await (listProjection ? frQuery.select(listProjection) : frQuery);
 
       blogs = allBlogs.filter((blog: any) => {
@@ -181,7 +181,7 @@ export const getBlogs = async (req: Request, res: Response): Promise<void> => {
       blogs = blogs.slice(skip, skip + limit);
     } else if (locale === 'es') {
       // For Spanish: only show published blogs where title matches languages.es.title
-      const esQuery = Blog.find({ "languages.es.title": { $exists: true, $ne: "" }, published: true }).sort({ createdAt: -1 });
+      const esQuery = Blog.find({ "languages.es.title": { $exists: true, $ne: "" }, published: true }).sort({ date: -1 });
       const allBlogs = await (listProjection ? esQuery.select(listProjection) : esQuery);
 
       blogs = allBlogs.filter((blog: any) => {
@@ -237,7 +237,7 @@ export const getFeaturedBlog = async (req: Request, res: Response): Promise<void
     const listProjection = excludeContent ? '-content -languages.fr.content -languages.es.content' : '';
 
     // Get all published featured blogs first
-    const featuredQuery = Blog.find({ featured: true, published: true }).sort({ createdAt: -1 });
+    const featuredQuery = Blog.find({ featured: true, published: true }).sort({ date: -1 });
     const allFeaturedBlogs = await (listProjection ? featuredQuery.select(listProjection) : featuredQuery);
 
     let featuredBlog = null;
@@ -276,7 +276,7 @@ export const getFeaturedBlog = async (req: Request, res: Response): Promise<void
       let latestBlog = null;
 
       if (locale === 'en') {
-        const latestEnQuery = Blog.find({ title: { $exists: true, $ne: "" }, published: true }).sort({ createdAt: -1 });
+        const latestEnQuery = Blog.find({ title: { $exists: true, $ne: "" }, published: true }).sort({ date: -1 });
         const allBlogs = await (listProjection ? latestEnQuery.select(listProjection) : latestEnQuery);
         latestBlog = allBlogs.find((blog: any) => {
           const mainTitle = blog.title?.trim();
@@ -287,7 +287,7 @@ export const getFeaturedBlog = async (req: Request, res: Response): Promise<void
           return true;
         });
       } else if (locale === 'fr') {
-        const latestFrQuery = Blog.find({ "languages.fr.title": { $exists: true, $ne: "" }, published: true }).sort({ createdAt: -1 });
+        const latestFrQuery = Blog.find({ "languages.fr.title": { $exists: true, $ne: "" }, published: true }).sort({ date: -1 });
         const allBlogs = await (listProjection ? latestFrQuery.select(listProjection) : latestFrQuery);
         latestBlog = allBlogs.find((blog: any) => {
           const mainTitle = blog.title?.trim();
@@ -295,7 +295,7 @@ export const getFeaturedBlog = async (req: Request, res: Response): Promise<void
           return mainTitle && frenchTitle && mainTitle === frenchTitle;
         });
       } else if (locale === 'es') {
-        const latestEsQuery = Blog.find({ "languages.es.title": { $exists: true, $ne: "" }, published: true }).sort({ createdAt: -1 });
+        const latestEsQuery = Blog.find({ "languages.es.title": { $exists: true, $ne: "" }, published: true }).sort({ date: -1 });
         const allBlogs = await (listProjection ? latestEsQuery.select(listProjection) : latestEsQuery);
         latestBlog = allBlogs.find((blog: any) => {
           const mainTitle = blog.title?.trim();

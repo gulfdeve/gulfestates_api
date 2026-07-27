@@ -101,6 +101,27 @@ app.get("/", (req, res) => {
   });
 });
 
+// Health check
+app.get("/health", (req, res) => {
+  const dbState = mongoose.connection.readyState;
+  // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+  const stateMap: Record<number, string> = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  };
+  const dbStatus = stateMap[dbState] ?? "unknown";
+  const healthy = dbState === 1;
+
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? "ok" : "degraded",
+    db: dbStatus,
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/seo", seoRoutes);
