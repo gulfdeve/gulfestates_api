@@ -53,6 +53,7 @@ export const getAllProperties = async (req: Request, res: Response) => {
       for: propertyFor,
       type,
       location,
+      lifestyle,
       title,
       minPrice,
       maxPrice,
@@ -93,6 +94,19 @@ export const getAllProperties = async (req: Request, res: Response) => {
         { "location.fr": { $regex: sanitizedLocation, $options: 'i' } },
         { "location.es": { $regex: sanitizedLocation, $options: 'i' } }
       ];
+    }
+
+    // Lifestyle filter (community/complex name, e.g. "Downtown Dubai", "Palm Jumeirah")
+    // matches against the same free-text location field, ANDed so it can combine with `location` (city/area)
+    if (lifestyle && typeof lifestyle === 'string') {
+      const sanitizedLifestyle = escapeStringRegexp(lifestyle);
+      filter.$and = (filter.$and || []).concat([{
+        $or: [
+          { "location.en": { $regex: sanitizedLifestyle, $options: 'i' } },
+          { "location.fr": { $regex: sanitizedLifestyle, $options: 'i' } },
+          { "location.es": { $regex: sanitizedLifestyle, $options: 'i' } }
+        ]
+      }]);
     }
 
     if (title && typeof title === 'string') {
