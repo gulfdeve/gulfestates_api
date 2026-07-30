@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Property from "../models/property.model.js";
 import { createNotification } from "./notification.controller.js";
+import { applySlugUpdate } from "../utils/slugRedirect.util.js";
 import escapeStringRegexp from "escape-string-regexp";
 
 // Helper function to get localized field
@@ -757,6 +758,16 @@ export const updateProperty = async (req: Request, res: Response) => {
     if (updateData.location) updateData.location = parseField(updateData.location);
     if (updateData.description) updateData.description = parseField(updateData.description);
 
+    // Handle manual slug edits: preserves the old slug as a redirect
+    if (updateData.slug) {
+      const parsedSlug = parseField(updateData.slug);
+      const slugResult = await applySlugUpdate(Property, "property", property, parsedSlug);
+      if (slugResult.error) {
+        return res.status(400).json({ success: false, message: slugResult.error });
+      }
+      updateData.slug = slugResult.slug;
+    }
+
     // Handle images array - ensure it's always an array
     if (updateData.images !== undefined) {
       if (typeof updateData.images === 'string') {
@@ -917,6 +928,7 @@ export const updateProperty = async (req: Request, res: Response) => {
     if (updateData.location) property.markModified('location');
     if (updateData.description) property.markModified('description');
     if (updateData.seo) property.markModified('seo');
+    if (updateData.slug) property.markModified('slug');
     if (updateData.amenities) property.markModified('amenities');
     if (updateData.images) property.markModified('images');
     if (updateData.agent) property.markModified('agent');

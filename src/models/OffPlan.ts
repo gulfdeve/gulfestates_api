@@ -273,10 +273,11 @@ async function generateUniqueSlug(
   }
 }
 
-// Pre-save hook to auto-generate slugs
+// Pre-save hook: slugs are auto-generated on first creation only.
+// Edits set the slug explicitly via the updateOffPlan controller (see slugRedirect.util.ts),
+// which also preserves the old slug as a redirect.
 OffPlanSchema.pre<IOffPlan>("save", async function (next) {
-  // Always generate slugs if title exists
-  if (this.title) {
+  if (this.isNew && this.title) {
     const OffPlan = mongoose.model<IOffPlan>("OffPlan");
 
     // Initialize slug object if it doesn't exist
@@ -286,39 +287,20 @@ OffPlanSchema.pre<IOffPlan>("save", async function (next) {
 
     const slugObj = this.slug as { en: string; fr?: string; es?: string };
 
-    // Generate slug for English (required) - always generate if title.en exists
-    if (this.title.en && (!slugObj.en || this.isModified("title.en"))) {
+    if (this.title.en && !slugObj.en) {
       const baseSlug = slugify(this.title.en);
-      slugObj.en = await generateUniqueSlug(
-        baseSlug,
-        OffPlan,
-        "slug.en",
-        this._id?.toString()
-      );
+      slugObj.en = await generateUniqueSlug(baseSlug, OffPlan, "slug.en");
     }
 
-    // Generate slug for French (optional) - generate if title.fr exists
-    if (this.title.fr && (!slugObj.fr || this.isModified("title.fr"))) {
+    if (this.title.fr && !slugObj.fr) {
       const baseSlug = slugify(this.title.fr);
-      slugObj.fr = await generateUniqueSlug(
-        baseSlug,
-        OffPlan,
-        "slug.fr",
-        this._id?.toString()
-      );
+      slugObj.fr = await generateUniqueSlug(baseSlug, OffPlan, "slug.fr");
     }
 
-    // Generate slug for Spanish (optional) - generate if title.es exists
-    if (this.title.es && (!slugObj.es || this.isModified("title.es"))) {
+    if (this.title.es && !slugObj.es) {
       const baseSlug = slugify(this.title.es);
-      slugObj.es = await generateUniqueSlug(
-        baseSlug,
-        OffPlan,
-        "slug.es",
-        this._id?.toString()
-      );
+      slugObj.es = await generateUniqueSlug(baseSlug, OffPlan, "slug.es");
     }
-
   }
   next();
 });

@@ -32,6 +32,7 @@ import jobApplicationRoutes from "./routes/jobApplication.routes.js";
 import sitemapRoutes from "./routes/sitemap.routes.js";
 import teamRoutes from "./routes/team.routes.js";
 import pagesContentRoutes from "./routes/pagesContent.routes.js";
+import redirectRoutes from "./routes/redirect.routes.js";
 
 // Middleware
 import { errorHandler } from "./middleware/error.middleware.js";
@@ -152,6 +153,7 @@ app.use("/api/job-applications", jobApplicationRoutes);
 app.use("/api/sitemap", sitemapRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/pages/content", pagesContentRoutes);
+app.use("/api/redirects", redirectRoutes);
 
 // Error handling
 app.use(notFound);

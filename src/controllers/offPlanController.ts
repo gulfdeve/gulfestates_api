@@ -5,6 +5,7 @@ import cloudinary from "../config/cloudinary.js";
 import { downloadAndUploadImage, downloadAndUploadMultipleImages } from "../utils/imageDownloader.js";
 import { translateToFrench, translateToSpanish, translateHtmlToFrench, translateHtmlToSpanish, delay } from "../utils/translation.util.js";
 import { fixCloudinaryUrl, extractPublicIdFromUrl } from "../utils/cloudinary.util.js";
+import { applySlugUpdate } from "../utils/slugRedirect.util.js";
 import escapeStringRegexp from "escape-string-regexp";
 
 // Helper function to get localized field
@@ -918,6 +919,16 @@ export const updateOffPlan = async (req: Request, res: Response) => {
       const existingLocation = (offplan as any).location && typeof (offplan as any).location === 'object' ? (offplan as any).location : {};
       updateData.location = { ...existingLocation, ...updateData.location };
     }
+    // Handle manual slug edits: preserves the old slug as a redirect
+    if (updateData.slug) {
+      const parsedSlug = parseField(updateData.slug);
+      const slugResult = await applySlugUpdate(OffPlan, "offplan", offplan, parsedSlug);
+      if (slugResult.error) {
+        return res.status(400).json({ success: false, message: slugResult.error });
+      }
+      updateData.slug = slugResult.slug;
+    }
+
     if (updateData.description) updateData.description = parseField(updateData.description);
     if (updateData.seo) {
       updateData.seo = parseField(updateData.seo);
@@ -1073,6 +1084,7 @@ export const updateOffPlan = async (req: Request, res: Response) => {
     if (updateData.location) offplan.markModified('location');
     if (updateData.description) offplan.markModified('description');
     if (updateData.seo) offplan.markModified('seo');
+    if (updateData.slug) offplan.markModified('slug');
     if (updateData.amenities) offplan.markModified('amenities');
     if (updateData.images) offplan.markModified('images');
     if (updateData.geoLocation) offplan.markModified('geoLocation');

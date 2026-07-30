@@ -210,50 +210,31 @@ async function generateUniqueSlug(
   }
 }
 
-// Pre-save hook to auto-generate slugs
+// Pre-save hook: slugs are auto-generated on first creation only.
+// Edits set the slug explicitly via the updateProperty controller (see slugRedirect.util.ts),
+// which also preserves the old slug as a redirect.
 propertySchema.pre<IProperty>("save", async function (next) {
-  // Always generate slugs if title exists
-  if (this.title) {
+  if (this.isNew && this.title) {
     const Property = mongoose.model<IProperty>("Property");
 
-    // Initialize slug object if it doesn't exist
     if (!this.slug) {
       this.slug = { en: "", fr: "", es: "" };
     }
 
-    // Generate slug for English (required) - always generate if title.en exists
-    if (this.title.en && (!this.slug.en || this.isModified("title.en"))) {
+    if (this.title.en && !this.slug.en) {
       const baseSlug = slugify(this.title.en);
-      this.slug.en = await generateUniqueSlug(
-        baseSlug,
-        Property,
-        "slug.en",
-        this._id?.toString()
-      );
+      this.slug.en = await generateUniqueSlug(baseSlug, Property, "slug.en");
     }
 
-    // Generate slug for French (optional) - generate if title.fr exists
-    if (this.title.fr && (!this.slug.fr || this.isModified("title.fr"))) {
+    if (this.title.fr && !this.slug.fr) {
       const baseSlug = slugify(this.title.fr);
-      this.slug.fr = await generateUniqueSlug(
-        baseSlug,
-        Property,
-        "slug.fr",
-        this._id?.toString()
-      );
+      this.slug.fr = await generateUniqueSlug(baseSlug, Property, "slug.fr");
     }
 
-    // Generate slug for Spanish (optional) - generate if title.es exists
-    if (this.title.es && (!this.slug.es || this.isModified("title.es"))) {
+    if (this.title.es && !this.slug.es) {
       const baseSlug = slugify(this.title.es);
-      this.slug.es = await generateUniqueSlug(
-        baseSlug,
-        Property,
-        "slug.es",
-        this._id?.toString()
-      );
+      this.slug.es = await generateUniqueSlug(baseSlug, Property, "slug.es");
     }
-
   }
   next();
 });
