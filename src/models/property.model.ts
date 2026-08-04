@@ -46,6 +46,7 @@ export interface IProperty extends Document {
   images: string[];
   for: "buy" | "rent";
   amenities?: string[];
+  communityCategories?: string[];
   nearbyLandmarks?: ILandmark[];
   agent?: IAgent;
   buildingInfo?: IBuildingInfo;
@@ -142,6 +143,13 @@ const propertySchema = new Schema<IProperty>(
     for: { type: String, enum: ["buy", "rent"], required: true },
     amenities: [{
       type: String,
+      default: []
+    }],
+    // Marketing/lifestyle tags shown on the public homepage's "Find Home" cards
+    // (independent of `type`, which is the architectural property type)
+    communityCategories: [{
+      type: String,
+      enum: ["waterfront", "luxury", "green", "branded"],
       default: []
     }],
     nearbyLandmarks: [landmarkSchema],

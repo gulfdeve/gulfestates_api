@@ -53,6 +53,7 @@ export const getAllProperties = async (req: Request, res: Response) => {
       locale = 'en',
       for: propertyFor,
       type,
+      communityCategory,
       location,
       lifestyle,
       title,
@@ -86,6 +87,11 @@ export const getAllProperties = async (req: Request, res: Response) => {
       filter.for = propertyFor;
     }
     if (type && typeof type === 'string') filter.type = type;
+
+    // Lifestyle/marketing category (waterfront, luxury, green, branded) - independent of `type`
+    if (communityCategory && typeof communityCategory === 'string') {
+      filter.communityCategories = communityCategory;
+    }
 
     // Search in all language fields for location and title
     if (location && typeof location === 'string') {
@@ -242,6 +248,7 @@ export const createProperty = async (req: Request, res: Response) => {
       for: propertyFor,
       description,
       amenities,
+      communityCategories,
       nearbyLandmarks,
       agent,
       buildingInfo,
@@ -464,6 +471,14 @@ export const createProperty = async (req: Request, res: Response) => {
         .map((item: any) => typeof item === 'string' ? item.trim() : item);
     }
 
+    // Parse and clean communityCategories - keep only valid enum strings
+    let parsedCommunityCategories = parseField(communityCategories) || [];
+    if (Array.isArray(parsedCommunityCategories)) {
+      parsedCommunityCategories = parsedCommunityCategories.filter(
+        (item: any) => ["waterfront", "luxury", "green", "branded"].includes(item)
+      );
+    }
+
     // For CREATE: Only use uploaded brochure file (uploaded to Cloudinary)
     // Don't accept brochure URL from body in create mode - only file uploads
     const finalBrochure = brochureUrl || "";
@@ -516,6 +531,7 @@ export const createProperty = async (req: Request, res: Response) => {
       for: propertyFor,
       description: parsedDescription,
       amenities: parsedAmenities,
+      communityCategories: parsedCommunityCategories,
       nearbyLandmarks: parseField(nearbyLandmarks) || [],
       agent: parseField(agent),
       buildingInfo: parseField(buildingInfo),
@@ -837,6 +853,15 @@ export const updateProperty = async (req: Request, res: Response) => {
       updateData.amenities = updateData.amenities.filter((item: any) => item !== false && item !== null && item !== "");
     }
 
+    if (updateData.communityCategories && typeof updateData.communityCategories === 'string') {
+      updateData.communityCategories = parseField(updateData.communityCategories);
+    }
+    if (Array.isArray(updateData.communityCategories)) {
+      updateData.communityCategories = updateData.communityCategories.filter(
+        (item: any) => ["waterfront", "luxury", "green", "branded"].includes(item)
+      );
+    }
+
     if (updateData.nearbyLandmarks && typeof updateData.nearbyLandmarks === 'string') {
       updateData.nearbyLandmarks = parseField(updateData.nearbyLandmarks);
     }
@@ -930,6 +955,7 @@ export const updateProperty = async (req: Request, res: Response) => {
     if (updateData.seo) property.markModified('seo');
     if (updateData.slug) property.markModified('slug');
     if (updateData.amenities) property.markModified('amenities');
+    if (updateData.communityCategories) property.markModified('communityCategories');
     if (updateData.images) property.markModified('images');
     if (updateData.agent) property.markModified('agent');
     if (updateData.buildingInfo) property.markModified('buildingInfo');
